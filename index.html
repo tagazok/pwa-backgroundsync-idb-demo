@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Progressive Web App: PhotoBooth</title>
+
+    <link rel="stylesheet" href="assets/css/styles.css">
+
+    <!-- Meta tag for changing browser colors. -->
+    <meta id="theme-color" name="theme-color" content="#37474F">
+
+    <!-- Meta tag for App-like behaviour in iOS -->
+    <meta name=”apple-mobile-web-app-capable” content=”yes”>
+
+    <!-- Web Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+</head>
+<body>
+    <header>Photo Web App</header>
+    <div class="container">
+        <div class="app">
+
+            <a href="#" id="start-camera" class="visible">Touch here to start the app.</a>
+            <video autoplay id="camera-stream"></video>
+
+            <p id="error-message"></p>
+
+            <div class="controls">
+            <a href="#" id="take-photo" title="Take Photo"><i class="material-icons">camera_alt</i></a>
+            </div>
+
+            <canvas></canvas>
+        </div>
+        <a href="#" id="capture-photo" class="round-button" title="Take Photo"><i class="material-icons">camera_alt</i></a>
+        <div class="list" id="photos-list">
+        </div>
+        <div class="list" id="photos-list-fb">
+        </div>
+        <div class="no-photo">Go take pictures !</div>
+</div>
+<script src="assets/js/vendors/idb.js"></script>
+<script src="assets/js/script.js"></script>
+
+</body>
+</html>
