@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function () {
         photos_list_fb = document.querySelector("#photos-list-fb");
 
     var reg = null;
+    var ds = new Datastore();
 
     // The getUserMedia interface is used for handling camera input.
     // Some browsers need a prefix so here we're covering all the options
@@ -68,6 +69,12 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     
+    ds.getAllPhotosFromDb().then(data => {
+        for (let photo of data) {
+            photos_list.insertBefore(generatePhotoTemplate(photo, false), photos_list.firstChild);
+        }
+    });
+    
     // Save photo and display it in the UI
     function addPhoto(snap) {
         const photo = {
@@ -76,19 +83,27 @@ document.addEventListener('DOMContentLoaded', function () {
             source: snap
         };
 
-        fetch('https://offline-demo-4b2ee.firebaseio.com/photos.json', {
-            method: 'post',
-            body: JSON.stringify(photo)
-        })
-        .then(response => {
-            photos_list.insertBefore(generatePhotoTemplate(photo, true), photos_list.firstChild);
+        if (reg) {
+            reg.sync.register('syncPhoto').then(() => {
+                console.log('syngPhoto registred');
+            });
+        }
+        ds.getStore().then(store => {
+            store.put(photo);
+            photos_list.insertBefore(generatePhotoTemplate(photo, false), photos_list.firstChild);
         });
-    }
+    } 
 
      // Return sync icon
     function getBackupStatusIcon(backup) {
         return backup ? "cloud_done" : "cloud_off";
     }
+
+    navigator.serviceWorker.addEventListener('message', event => {
+        const message = event.data.message;
+
+        document.querySelector(`#photo-${message.id} .material-icons`).textContent = message.action;
+    });
 
     // Generate html template for photo card
     function generatePhotoTemplate(photo, backup) {

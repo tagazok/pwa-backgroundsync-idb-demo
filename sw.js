@@ -1,6 +1,10 @@
+self.importScripts('./assets/js/vendors/idb.js');
+self.importScripts('./assets/js/datastore.js');
+
 const version = '1.0.1'
 const cacheName = 'offlinedemo-v' + Date.now();
 
+var ds = new Datastore();
 
 this.addEventListener('install', function(event) {
 	event.waitUntil(
@@ -15,7 +19,8 @@ this.addEventListener('install', function(event) {
 				'./assets/js/script.js',
 				'./assets/icons/ic-face.png',
 				'./assets/icons/ic-face-large.png',
-				'./manifest.json'
+				'./manifest.json',
+				'./assets/js/vendors/idb.js'
 			])
 			.then(function() {
 				console.log('Success! App is available offline!');
@@ -47,4 +52,37 @@ self.addEventListener('fetch', function(event) {
 			return caches.match('/offline.html');
 		})
   	);
+});
+
+async function uploadPhoto(photo) {
+	broadcast('backup', photo.id);
+	await fetch('https://offline-demo-4b2ee.firebaseio.com/photos.json', {
+             method: 'post',
+             body: JSON.stringify(photo)
+         });
+	broadcast('cloud_done', photo.id);
+}
+
+async function broadcast(action, photoId) {
+	let clients = await self.clients.matchAll();
+	for (let client of clients) {
+		client.postMessage({
+			client: client.id,
+			message: {action: action, id: photoId}
+		});
+	}
+}
+
+async function uploadPhotos() {
+	const photos = await ds.getAllPhotosFromDb();
+	for (let photo of photos) {
+		await uploadPhoto(photo);
+		await ds.removePhoto(photo);
+	}
+}
+
+self.addEventListener('sync', event => {
+	if (event.tag === 'syncPhoto') {
+		event.waitUntil(uploadPhotos());
+	}
 });
