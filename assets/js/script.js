@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', function() {
 
     // References to all the element we will need.
     var video = document.querySelector('#camera-stream'),
@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', function () {
         take_photo_btn = document.querySelector('#take-photo'),
         error_message = document.querySelector('#error-message'),
         add_photo = document.querySelector('#add-photo')
-        capture_photo = document.querySelector('#capture-photo'),
+    capture_photo = document.querySelector('#capture-photo'),
         photos_list = document.querySelector("#photos-list"),
         photos_list_fb = document.querySelector("#photos-list-fb");
 
@@ -24,20 +24,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (!navigator.getUserMedia) {
         displayErrorMessage("Your browser doesn't have support for the navigator.getUserMedia interface.");
-    }
-    else {
-        navigator.getUserMedia(
-            {
-                video: true
+    } else {
+        navigator.getUserMedia({
+                video: { width: 1280, height: 720 }
             },
-            function (stream) {
+            function(stream) {
                 video.srcObject = stream;
 
-                video.onplay = function () {
+                video.onplay = function() {
                     showVideo();
                 };
             },
-            function (err) {
+            function(err) {
                 displayErrorMessage("There was an error with accessing the camera stream: " + err.name, err);
             }
         );
@@ -52,13 +50,25 @@ document.addEventListener('DOMContentLoaded', function () {
                 reg.update();
                 console.log("Service worker registered");
             });
+        navigator.serviceWorker.addEventListener('message', event => {
+            let message = event.data.message;
+            document.querySelector(`#photo-${message.id} .material-icons`)
+                .textContent = message.action;
+        })
     }
 
+    var dbPromise = idb.open('offlinedemo-db', 1, upgradeDB => {
+        upgradeDB.createStore('photobooth', {
+            keypath: 'id',
+        });
+    });
+
     // Get data from Firebase
+    // offline-demo-59c34
     fetch('https://offline-demo-4b2ee.firebaseio.com/photos.json?orderBy="id"&limitToLast=3')
-        .then(function (response) {
+        .then(function(response) {
             return response.json();
-        }).then(function (data) {
+        }).then(function(data) {
             console.log(data);
             if (data) {
                 document.querySelector('.no-photo').style.display = 'none';
@@ -67,7 +77,32 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         });
-    
+
+    function getAllPhotosFromDB() {
+        return dbPromise.then(db => {
+            return db.transaction('photobooth', 'readwrite')
+                .objectStore('photobooth')
+                .getAll();
+        })
+    }
+
+    dbPromise.then(async db => {
+        const data = await getAllPhotosFromDB();
+        for (let photo of data) {
+            photos_list.insertBefore(generatePhotoTemplate(photo, false), photos_list.firstChild);
+        }
+    });
+
+    async function getStore() {
+        const db = await dbPromise;
+        return db.transaction('photobooth').objectStore('photobooth');
+    }
+
+    async function getAllPhotosFromDB() {
+        const store = await getStore();
+        return store.getAll();
+    }
+
     // Save photo and display it in the UI
     function addPhoto(snap) {
         const photo = {
@@ -76,16 +111,26 @@ document.addEventListener('DOMContentLoaded', function () {
             source: snap
         };
 
-        fetch('https://offline-demo-4b2ee.firebaseio.com/photos.json', {
-            method: 'post',
-            body: JSON.stringify(photo)
-        })
-        .then(response => {
-            photos_list.insertBefore(generatePhotoTemplate(photo, true), photos_list.firstChild);
+        if (reg) {
+            reg.sync.register('postPhoto').then(() => {
+                console.log('sync registered');
+            })
+        }
+
+        dbPromise.then(db => {
+            let tx = db.transaction('photobooth', 'readwrite');
+            let store = tx.objectStore('photobooth');
+            store.put(photo);
+            photos_list.insertBefore(generatePhotoTemplate(photo, false), photos_list.firstChild);
         });
+
+        // fetch('https://offline-demo-4b2ee.firebaseio.com/photos.json', {
+        //     method: 'post',
+        //     body: JSON.stringify(photo)
+        // })
     }
 
-     // Return sync icon
+    // Return sync icon
     function getBackupStatusIcon(backup) {
         return backup ? "cloud_done" : "cloud_off";
     }
@@ -112,7 +157,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Mobile browsers cannot play video without user input,
     // so here we're using a button to start it manually.
-    start_camera.addEventListener("click", function (e) {
+    start_camera.addEventListener("click", function(e) {
 
         e.preventDefault();
         video.play();
@@ -120,13 +165,13 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Event triggered when user clicks to display capture window
-    capture_photo.addEventListener("click", function (e) {
+    capture_photo.addEventListener("click", function(e) {
         document.querySelector(".app").className += " visible";
         capture_photo.style.display = "none";
     });
 
     // Event triggered wen user take a picture
-    take_photo_btn.addEventListener("click", function (e) {
+    take_photo_btn.addEventListener("click", function(e) {
 
         e.preventDefault();
 
@@ -161,7 +206,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return hidden_canvas.toDataURL('image/png');
         }
     }
-    
+
     function showVideo() {
         hideUI();
         video.classList.add("visible");
