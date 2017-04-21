@@ -11,7 +11,7 @@ self.addEventListener('sync', event => {
 	console.log('sync event fired')
 });
 ```
-* Dans script.js (addPhoto() - line 97)
+* Dans script.js (addPhoto() - line 72)
 
 ```javascript
 if (reg) {
@@ -23,6 +23,8 @@ if (reg) {
 Tests : 
 * check with connection : both console.log appears  
 * disconnect and reconnect : "sync postPhoto" will display after we get connection
+
+dans sw.js:
 
 ```javascript
 self.addEventListener('sync', event => {
@@ -57,41 +59,30 @@ C'est ce qu'on va utiliser
 * Dans sw.js  
 On cache './assets/js/vendors/idb.js'
 * Dans script.js
-    + En haut
 
-    ```javascript
-    var db = null;
-    ```
++ Après le Init du serviceWorker
 
-    + Après le Init du serviceWorker
-
-    ```javascript
-    // Init db
-    var dbPromise = idb.open('offlinedemo-db', 1, upgradeDb => {
-        upgradeDb.createObjectStore('photobooth', {
-            keyPath: 'id',
-        });
+```javascript
+// Init db
+var dbPromise = idb.open('offlinedemo-db', 1, upgradeDb => {
+    upgradeDb.createObjectStore('photobooth', {
+        keyPath: 'id',
     });
-    ```
+});
+```
 
-    Montrer qu'on voit la base de donnée dans les devtools et qu'elle est vide
+Montrer qu'on voit la base de donnée dans les devtools et qu'elle est vide
 
-    + dans addPhoto() - l129
++ dans addPhoto() - l76
 
-    ```javascript
-    dbPromise.then(db => {
-        let tx = db.transaction('photobooth', 'readwrite');
-        let store = tx.objectStore('photobooth');
-        let photo = {
-            id: Date.now(),
-            date: new Date().toString(),
-            source: snap
-        };
-        store.put(photo);
-        photos.push(photo);
-        photos_list.insertBefore(generatePhotoTemplate(photo, false), photos_list.firstChild);
-    });
-    ```
+```javascript
+dbPromise.then(db => {
+    let tx = db.transaction('photobooth', 'readwrite');
+    let store = tx.objectStore('photobooth');
+    store.put(photo);
+    photos_list.insertBefore(generatePhotoTemplate(photo, false), photos_list.firstChild);
+});
+```
  
 Tests :
 * Faire 2 ou 3 photos
@@ -100,10 +91,12 @@ Tests :
 
 On fait une fonction qui récupère toutes les photos de la bdd
 
+dans script.js:
+
 ```javascript
 function getAllPhotosFromDb() {
     return dbPromise.then(function(db) {
-        return db.transaction('photobooth', 'read').objectStore('photobooth')
+        return db.transaction('photobooth', 'readwrite').objectStore('photobooth')
             .getAll();
     });
 }
@@ -112,7 +105,7 @@ dbPromise.then(function(db) {
     getAllPhotosFromDb()
     .then(function(data) {
         for (let photo of data) {
-            photos_list.insertBefore(generatePhotoTemplate(photo, true), photos_list.firstChild);
+            photos_list.insertBefore(generatePhotoTemplate(photo, false), photos_list.firstChild);
         }
     });
 });
@@ -161,7 +154,7 @@ dbPromise.then(async db => {
 ```
 
 __montrer slide du schéma pour montrer ou on en est__
-On va aussi pouvoir refactoriser dans addPhoto() -l148
+On va aussi pouvoir refactoriser dans addPhoto() -l 109
    + dans addPhoto()
 
 ```javascript
@@ -182,7 +175,7 @@ Ensuite, on veut que le service worker aille chercher les images et les envoient
 self.importScripts('./assets/js/vendors/idb.js');
 ```
 
-Récupérer code l49 dans script.js
+Récupérer code l 55 dans script.js
 
 ```javascript
 var dbPromise = idb.open('offlinedemo-db', 1, upgradeDb => {
@@ -214,19 +207,29 @@ async function uploadPhotos() {
 
 Récupérer getStore et getAllPhotosFromDb() - l65
 
+```javascript
+async function getStore() {
+    const db = await dbPromise;
+    return db.transaction('photobooth', 'readwrite').objectStore('photobooth');
+}
+
+async function getAllPhotosFromDB() {
+    const store = await getStore();
+    return store.getAll();
+}
+```
 
 ```javascript
 async function uploadPhotos() {
 	const photos = await getAllPhotosFromDb();
-	//for (let photo of photos) {
-	//	try {
-	//		await uploadPhoto(photo);
+	for (let photo of photos) {
+		try {
+			await uploadPhoto(photo);
 	//		await removePhotoFromDb(photo);
-	//	} catch (e) {
-    //    // TODO : retry
-	//		console.log(e.name + " " + e);
-	//	}
-	//}
+		} catch (e) {
+			console.log(e.name + " " + e);
+		}
+	}
 }
 ```
 
@@ -261,6 +264,7 @@ Pb : l'interface ne se met pas à jour
 
 ## Communication sw/client
 On veut que le client sache quand on est en train d'uploader une photo et quand le backup est finit
+
 * Dans sw.js
 
 ```javascript
@@ -285,18 +289,26 @@ broadcast("cloud_done", photo.id);
 
 Une fois qu'on envoi les événements, il faut bien les recevoir du côté de notre client
 // TODO : Mettre le nom de l'icone directement dans l'action du message
+
 * Dans script.js
+
 ```javascript
 navigator.serviceWorker.addEventListener('message', event => {
     let message = event.data.message;
     document.querySelector(`#photo-${message.id} .material-icons`).textContent = message.action;
 });
 ```
+
 # __PENSER A REFRESH POUR AVOIR LES CLIENTS__
 
 On s'approche d'une expérience offline convaincante.
 Il nous manque encore un petit quelque chose. Quand on lance l'application sans réseau, nous n'avons pas les images de firebase qui se chargent
 Ce qu'on va faire c'est qu'on va aussi les cachées
+
+
+# END
+
+
 
 ```javascript
 var dbPromise = idb.open('offlinedemo-db', 1, upgradeDb => {
